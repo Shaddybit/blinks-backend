@@ -7,8 +7,27 @@ require("dotenv").config();
 
 const app = express();
 
+// 🚀 1. iOS Safari & Cross-Origin Bulletproof CORS Configuration
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "X-Requested-With",
+      "Origin",
+      "Cache-Control"
+    ],
+    credentials: false
+  })
+);
+
+// 🚀 2. Pre-flight OPTIONS Handle (Mandatory for iOS WebKit)
+app.options("*", cors());
+
 // Middlewares (Increased limit for base64 images)
-app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -192,8 +211,8 @@ app.post("/api/analytics/event", async (req, res) => {
   }
 });
 
-// Server Start
+// Server Start (Render sets process.env.PORT automatically)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
