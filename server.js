@@ -110,7 +110,33 @@ app.get("/", (req, res) => {
   res.send("Blinks API is running live 🚀");
 });
 
-// 2. Get All Profiles (Admin)
+// 🔑 2. Admin Authentication Route
+app.post("/api/auth/admin-login", (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const ADMIN_USER = process.env.ADMIN_USER || "admin@blinks.pk";
+    const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
+
+    if (username === ADMIN_USER && password === ADMIN_PASS) {
+      return res.json({
+        success: true,
+        message: "Login successful",
+        token: "admin-secret-session-token",
+        user: { username: ADMIN_USER, role: "admin" }
+      });
+    } else {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid admin credentials"
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3. Get All Profiles (Admin)
 app.get("/api/profiles", async (req, res) => {
   try {
     const profiles = await Profile.find().sort({ createdAt: -1 });
@@ -120,7 +146,7 @@ app.get("/api/profiles", async (req, res) => {
   }
 });
 
-// 3. Get Single Profile by Slug (For Public QR Profile View)
+// 4. Get Single Profile by Slug (For Public QR Profile View)
 app.get("/api/profiles/slug/:slug", async (req, res) => {
   try {
     const slug = req.params.slug.toLowerCase().trim();
@@ -134,7 +160,7 @@ app.get("/api/profiles/slug/:slug", async (req, res) => {
   }
 });
 
-// 4. Create Profile
+// 5. Create Profile
 app.post("/api/profiles", async (req, res) => {
   try {
     const data = req.body;
@@ -153,7 +179,7 @@ app.post("/api/profiles", async (req, res) => {
   }
 });
 
-// 5. Update Profile
+// 6. Update Profile
 app.put("/api/profiles/:id", async (req, res) => {
   try {
     const updated = await Profile.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -163,7 +189,7 @@ app.put("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 6. Delete Profile
+// 7. Delete Profile
 app.delete("/api/profiles/:id", async (req, res) => {
   try {
     await Profile.findByIdAndDelete(req.params.id);
@@ -173,7 +199,7 @@ app.delete("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 7. Track QR Scan
+// 8. Track QR Scan
 app.post("/api/analytics/scan", async (req, res) => {
   try {
     const { slug } = req.body;
@@ -189,7 +215,7 @@ app.post("/api/analytics/scan", async (req, res) => {
   }
 });
 
-// 8. Track Action / Click Event
+// 9. Track Action / Click Event
 app.post("/api/analytics/event", async (req, res) => {
   try {
     const { slug, eventType } = req.body;
@@ -211,7 +237,7 @@ app.post("/api/analytics/event", async (req, res) => {
   }
 });
 
-// Server Start (Render sets process.env.PORT automatically)
+// Server Start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
