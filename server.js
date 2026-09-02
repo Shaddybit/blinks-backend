@@ -52,6 +52,7 @@ const ProfileSchema = new mongoose.Schema(
     // Contact & Social
     phone: { type: String, default: "" },
     whatsapp: { type: String, default: "" },
+    email: { type: String, default: "" },
     facebook: { type: String, default: "" },
     instagram: { type: String, default: "" },
     tiktok: { type: String, default: "" },
@@ -64,13 +65,22 @@ const ProfileSchema = new mongoose.Schema(
     jazzcashName: { type: String, default: "" },
     bankName: { type: String, default: "" },
     bankTitle: { type: String, default: "" },
+    bankAccountTitle: { type: String, default: "" },
     accountNumber: { type: String, default: "" },
+    bankAccountNumber: { type: String, default: "" },
+    bankAccount: { type: String, default: "" },
     iban: { type: String, default: "" },
+    showPayment: { type: Boolean, default: false },
 
     // Location & Timing
     address: { type: String, default: "" },
     googleMaps: { type: String, default: "" },
     workingHours: { type: String, default: "" },
+
+    // ⭐ GOOGLE REVIEWS (NOW OFFICIALLY IN SCHEMA)
+    googleReviewLink: { type: String, default: "" },
+    googleReviewUrl: { type: String, default: "" },
+    googleReview: { type: String, default: "" },
 
     // Media & Docs
     profilePhoto: { type: String, default: "" },
@@ -91,6 +101,13 @@ const ProfileSchema = new mongoose.Schema(
     bgPhoto: { type: String, default: "" },
     bgColor: { type: String, default: "#ffffff" },
 
+    // Fonts & Colors Customization
+    headingFont: { type: String, default: "sans-serif" },
+    bodyFont: { type: String, default: "sans-serif" },
+    headingColor: { type: String, default: "#0f172a" },
+    bodyTextColor: { type: String, default: "#334155" },
+
+    // Status
     status: { type: String, default: "Active" },
 
     // Live Analytics
@@ -179,10 +196,28 @@ app.post("/api/profiles", async (req, res) => {
   }
 });
 
-// 6. Update Profile
+// 6. Update Profile (Supports Mongo _id OR Slug)
 app.put("/api/profiles/:id", async (req, res) => {
   try {
-    const updated = await Profile.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const target = req.params.id;
+    let updated = null;
+
+    if (mongoose.Types.ObjectId.isValid(target)) {
+      updated = await Profile.findByIdAndUpdate(target, req.body, { new: true });
+    }
+
+    if (!updated) {
+      updated = await Profile.findOneAndUpdate(
+        { slug: target.toLowerCase().trim() },
+        req.body,
+        { new: true }
+      );
+    }
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Profile not found to update" });
+    }
+
     res.json({ success: true, profile: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -192,7 +227,12 @@ app.put("/api/profiles/:id", async (req, res) => {
 // 7. Delete Profile
 app.delete("/api/profiles/:id", async (req, res) => {
   try {
-    await Profile.findByIdAndDelete(req.params.id);
+    const target = req.params.id;
+    if (mongoose.Types.ObjectId.isValid(target)) {
+      await Profile.findByIdAndDelete(target);
+    } else {
+      await Profile.findOneAndDelete({ slug: target.toLowerCase().trim() });
+    }
     res.json({ success: true, message: "Profile deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
