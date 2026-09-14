@@ -1,5 +1,5 @@
-const dns = require('node:dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+const dns = require("node:dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -7,7 +7,7 @@ require("dotenv").config();
 
 const app = express();
 
-// 🚀 1. iOS Safari & Cross-Origin Bulletproof CORS Configuration
+// 🚀 1. CORS Configuration (iOS Safari & Cross-Origin Supported)
 app.use(
   cors({
     origin: "*",
@@ -18,16 +18,16 @@ app.use(
       "Accept",
       "X-Requested-With",
       "Origin",
-      "Cache-Control"
+      "Cache-Control",
     ],
-    credentials: false
+    credentials: false,
   })
 );
 
-// 🚀 2. Pre-flight OPTIONS Handle (Mandatory for iOS WebKit)
+// 🚀 2. Pre-flight OPTIONS Handle
 app.options("*", cors());
 
-// Middlewares (Increased limit for base64 images)
+// Middlewares (50mb Limit for Base64 Images)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -61,8 +61,10 @@ const ProfileSchema = new mongoose.Schema(
     // Payments
     easypaisa: { type: String, default: "" },
     easypaisaName: { type: String, default: "" },
+    easyPaisa: { type: String, default: "" },
     jazzcash: { type: String, default: "" },
     jazzcashName: { type: String, default: "" },
+    jazzCash: { type: String, default: "" },
     bankName: { type: String, default: "" },
     bankTitle: { type: String, default: "" },
     bankAccountTitle: { type: String, default: "" },
@@ -77,7 +79,7 @@ const ProfileSchema = new mongoose.Schema(
     googleMaps: { type: String, default: "" },
     workingHours: { type: String, default: "" },
 
-    // ⭐ GOOGLE REVIEWS (NOW OFFICIALLY IN SCHEMA)
+    // ⭐ Google Reviews
     googleReviewLink: { type: String, default: "" },
     googleReviewUrl: { type: String, default: "" },
     googleReview: { type: String, default: "" },
@@ -94,7 +96,7 @@ const ProfileSchema = new mongoose.Schema(
     products: { type: Array, default: [] },
     reviews: { type: Array, default: [] },
 
-    // Public Article / Blog
+    // Blog
     blogTitle: { type: String, default: "" },
     blogContent: { type: String, default: "" },
     blogImage: { type: String, default: "" },
@@ -110,7 +112,7 @@ const ProfileSchema = new mongoose.Schema(
     // Status
     status: { type: String, default: "Active" },
 
-    // Live Analytics
+    // Analytics
     scans: { type: Number, default: 0 },
     totalActions: { type: Number, default: 0 },
     eventAnalytics: { type: Object, default: {} },
@@ -127,11 +129,10 @@ app.get("/", (req, res) => {
   res.send("Blinks API is running live 🚀");
 });
 
-// 🔑 2. Admin Authentication Route
+// 2. Admin Login
 app.post("/api/auth/admin-login", (req, res) => {
   try {
     const { username, password } = req.body;
-
     const ADMIN_USER = process.env.ADMIN_USER || "admin@blinks.pk";
     const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
 
@@ -140,12 +141,12 @@ app.post("/api/auth/admin-login", (req, res) => {
         success: true,
         message: "Login successful",
         token: "admin-secret-session-token",
-        user: { username: ADMIN_USER, role: "admin" }
+        user: { username: ADMIN_USER, role: "admin" },
       });
     } else {
       return res.status(401).json({
         success: false,
-        message: "Invalid admin credentials"
+        message: "Invalid admin credentials",
       });
     }
   } catch (err) {
@@ -153,7 +154,7 @@ app.post("/api/auth/admin-login", (req, res) => {
   }
 });
 
-// 3. Get All Profiles (Admin)
+// 3. Get All Profiles
 app.get("/api/profiles", async (req, res) => {
   try {
     const profiles = await Profile.find().sort({ createdAt: -1 });
@@ -163,7 +164,7 @@ app.get("/api/profiles", async (req, res) => {
   }
 });
 
-// 4. Get Single Profile by Slug (For Public QR Profile View)
+// 4. Get Profile by Slug
 app.get("/api/profiles/slug/:slug", async (req, res) => {
   try {
     const slug = req.params.slug.toLowerCase().trim();
@@ -196,21 +197,25 @@ app.post("/api/profiles", async (req, res) => {
   }
 });
 
-// 6. Update Profile (Supports Mongo _id OR Slug)
+// 6. Update Profile (Supports ObjectId OR Slug with $set)
 app.put("/api/profiles/:id", async (req, res) => {
   try {
     const target = req.params.id;
     let updated = null;
 
     if (mongoose.Types.ObjectId.isValid(target)) {
-      updated = await Profile.findByIdAndUpdate(target, req.body, { new: true });
+      updated = await Profile.findByIdAndUpdate(
+        target,
+        { $set: req.body },
+        { new: true, runValidators: false }
+      );
     }
 
     if (!updated) {
       updated = await Profile.findOneAndUpdate(
         { slug: target.toLowerCase().trim() },
-        req.body,
-        { new: true }
+        { $set: req.body },
+        { new: true, runValidators: false }
       );
     }
 
@@ -220,6 +225,7 @@ app.put("/api/profiles/:id", async (req, res) => {
 
     res.json({ success: true, profile: updated });
   } catch (err) {
+    console.error("Update Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -239,7 +245,7 @@ app.delete("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 8. Track QR Scan
+// 8. Track Scan
 app.post("/api/analytics/scan", async (req, res) => {
   try {
     const { slug } = req.body;
@@ -255,7 +261,7 @@ app.post("/api/analytics/scan", async (req, res) => {
   }
 });
 
-// 9. Track Action / Click Event
+// 9. Track Events
 app.post("/api/analytics/event", async (req, res) => {
   try {
     const { slug, eventType } = req.body;
@@ -279,6 +285,6 @@ app.post("/api/analytics/event", async (req, res) => {
 
 // Server Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
