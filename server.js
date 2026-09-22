@@ -1,5 +1,3 @@
-const dns = require("node:dns");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -31,13 +29,39 @@ app.options("*", cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// MongoDB Connection
+// 🚀 3. Serverless Optimized MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;
+let cachedDb = null;
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Atlas Connected Successfully"))
-  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
+const connectDB = async () => {
+  if (cachedDb && mongoose.connection.readyState === 1) {
+    return cachedDb;
+  }
+  try {
+    cachedDb = await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log("✅ MongoDB Atlas Connected Successfully");
+    return cachedDb;
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err);
+    throw err;
+  }
+};
+
+// Har incoming API request se pehle database connection ensure karein
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+      error: error.message,
+    });
+  }
+});
 
 // ================= SCHEMA & MODEL =================
 const ProfileSchema = new mongoose.Schema(
