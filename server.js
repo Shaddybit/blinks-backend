@@ -5,31 +5,32 @@ require("dotenv").config();
 
 const app = express();
 
-// 🚀 1. CORS Configuration (iOS Safari & Cross-Origin Supported)
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Accept",
-      "X-Requested-With",
-      "Origin",
-      "Cache-Control",
-    ],
-    credentials: false,
-  })
-);
+// 🚀 1. Universal CORS Configuration (Vercel Serverless Ready)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
+  );
 
-// 🚀 2. Pre-flight OPTIONS Handle
-app.options("*", cors());
+  // Preflight requests return early
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
+app.use(cors());
 
 // Middlewares (50mb Limit for Base64 Images)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// 🚀 3. Serverless Optimized MongoDB Connection
+// 🚀 2. Serverless Optimized MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;
 let cachedDb = null;
 
