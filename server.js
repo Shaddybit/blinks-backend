@@ -17,7 +17,6 @@ app.use((req, res, next) => {
     "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
   );
 
-  // Preflight requests return early
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -50,7 +49,6 @@ const connectDB = async () => {
   }
 };
 
-// Har incoming API request se pehle database connection ensure karein
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -74,7 +72,6 @@ const ProfileSchema = new mongoose.Schema(
     bio: { type: String, default: "" },
     announcement: { type: String, default: "" },
 
-    // Contact & Social
     phone: { type: String, default: "" },
     whatsapp: { type: String, default: "" },
     email: { type: String, default: "" },
@@ -83,7 +80,6 @@ const ProfileSchema = new mongoose.Schema(
     tiktok: { type: String, default: "" },
     linkedin: { type: String, default: "" },
 
-    // Payments
     easypaisa: { type: String, default: "" },
     easypaisaName: { type: String, default: "" },
     easyPaisa: { type: String, default: "" },
@@ -99,45 +95,36 @@ const ProfileSchema = new mongoose.Schema(
     iban: { type: String, default: "" },
     showPayment: { type: Boolean, default: false },
 
-    // Location & Timing
     address: { type: String, default: "" },
     googleMaps: { type: String, default: "" },
     workingHours: { type: String, default: "" },
 
-    // ⭐ Google Reviews
     googleReviewLink: { type: String, default: "" },
     googleReviewUrl: { type: String, default: "" },
     googleReview: { type: String, default: "" },
 
-    // Media & Docs
     profilePhoto: { type: String, default: "" },
     coverPhoto: { type: String, default: "" },
     gallery: { type: [String], default: [] },
     businessDocument: { type: [String], default: [] },
     businessDocumentTitle: { type: String, default: "Menu / Services" },
 
-    // Products & Reviews
     catalogTitle: { type: String, default: "Featured Products & Services" },
     products: { type: Array, default: [] },
     reviews: { type: Array, default: [] },
 
-    // Blog
     blogTitle: { type: String, default: "" },
     blogContent: { type: String, default: "" },
     blogImage: { type: String, default: "" },
     bgPhoto: { type: String, default: "" },
     bgColor: { type: String, default: "#ffffff" },
 
-    // Fonts & Colors Customization
     headingFont: { type: String, default: "sans-serif" },
     bodyFont: { type: String, default: "sans-serif" },
     headingColor: { type: String, default: "#0f172a" },
     bodyTextColor: { type: String, default: "#334155" },
 
-    // Status
     status: { type: String, default: "Active" },
-
-    // Analytics
     scans: { type: Number, default: 0 },
     totalActions: { type: Number, default: 0 },
     eventAnalytics: { type: Object, default: {} },
@@ -179,17 +166,41 @@ app.post("/api/auth/admin-login", (req, res) => {
   }
 });
 
-// 3. Get All Profiles
+// 3. 🎯 ULTRA-LIGHT GET ALL PROFILES (Images aur heavy data filter kar diya - Size: 10-20 KB)
 app.get("/api/profiles", async (req, res) => {
   try {
-    const profiles = await Profile.find().sort({ createdAt: -1 });
+    const profiles = await Profile.find()
+      .select("name businessName slug designation phone status scans totalActions createdAt")
+      .sort({ createdAt: -1 });
     res.json({ success: true, profiles });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// 4. Get Profile by Slug
+// 4. 🎯 GET SINGLE PROFILE BY ID OR SLUG (Sirf ek profile ka pura data aayega)
+app.get("/api/profiles/single/:identifier", async (req, res) => {
+  try {
+    const target = req.params.identifier.trim();
+    let profile = null;
+
+    if (mongoose.Types.ObjectId.isValid(target)) {
+      profile = await Profile.findById(target);
+    }
+    if (!profile) {
+      profile = await Profile.findOne({ slug: target.toLowerCase() });
+    }
+
+    if (!profile) {
+      return res.status(404).json({ success: false, message: "Profile not found" });
+    }
+    res.json({ success: true, profile });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Purana compatibility slug route
 app.get("/api/profiles/slug/:slug", async (req, res) => {
   try {
     const slug = req.params.slug.toLowerCase().trim();
@@ -211,7 +222,7 @@ app.post("/api/profiles", async (req, res) => {
 
     const existing = await Profile.findOne({ slug: data.slug });
     if (existing) {
-      return res.status(400).json({ success: false, message: "Slug already exists. Choose a unique handle." });
+      return res.status(400).json({ success: false, message: "Slug already exists." });
     }
 
     const newProfile = new Profile(data);
@@ -222,7 +233,7 @@ app.post("/api/profiles", async (req, res) => {
   }
 });
 
-// 6. Update Profile (Supports ObjectId OR Slug with $set)
+// 6. Update Profile
 app.put("/api/profiles/:id", async (req, res) => {
   try {
     const target = req.params.id;
@@ -270,7 +281,7 @@ app.delete("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 8. Track Scan
+// 8. Analytics
 app.post("/api/analytics/scan", async (req, res) => {
   try {
     const { slug } = req.body;
@@ -286,7 +297,6 @@ app.post("/api/analytics/scan", async (req, res) => {
   }
 });
 
-// 9. Track Events
 app.post("/api/analytics/event", async (req, res) => {
   try {
     const { slug, eventType } = req.body;
@@ -308,7 +318,6 @@ app.post("/api/analytics/event", async (req, res) => {
   }
 });
 
-// Server Start
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, "0.0.0.0", () => {
@@ -316,5 +325,4 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// 🚀 Vercel Serverless Export
 module.exports = app;
