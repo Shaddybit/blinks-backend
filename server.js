@@ -5,29 +5,32 @@ require("dotenv").config();
 
 const app = express();
 
-// 🚀 1. Universal CORS Configuration (Vercel Serverless Ready)
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
-  );
+// 🛡️ 1. SECURE CORS CONFIGURATION
+const allowedOrigins = [
+  "https://blinkspk.com",
+  "https://www.blinkspk.com",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-});
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS policy does not allow access from this origin."));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "X-Requested-With"]
+  })
+);
 
-app.use(cors());
-
-// Middlewares (50mb Limit for Base64 Images)
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// Middlewares
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // 🚀 2. Serverless Optimized MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;
@@ -68,6 +71,7 @@ const ProfileSchema = new mongoose.Schema(
     name: { type: String, default: "" },
     businessName: { type: String, default: "" },
     slug: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    businessCategory: { type: String, default: "food", trim: true, lowercase: true },
     designation: { type: String, default: "" },
     bio: { type: String, default: "" },
     announcement: { type: String, default: "" },
@@ -81,18 +85,13 @@ const ProfileSchema = new mongoose.Schema(
     linkedin: { type: String, default: "" },
 
     easypaisa: { type: String, default: "" },
-    easypaisaName: { type: String, default: "" },
     easyPaisa: { type: String, default: "" },
     jazzcash: { type: String, default: "" },
-    jazzcashName: { type: String, default: "" },
     jazzCash: { type: String, default: "" },
     bankName: { type: String, default: "" },
-    bankTitle: { type: String, default: "" },
     bankAccountTitle: { type: String, default: "" },
-    accountNumber: { type: String, default: "" },
     bankAccountNumber: { type: String, default: "" },
     bankAccount: { type: String, default: "" },
-    iban: { type: String, default: "" },
     showPayment: { type: Boolean, default: false },
 
     address: { type: String, default: "" },
@@ -134,11 +133,26 @@ const ProfileSchema = new mongoose.Schema(
 
 const Profile = mongoose.model("Profile", ProfileSchema);
 
+// 🛡️ SECURITY TOKEN CHECKER MIDDLEWARE
+const verifySecretAuth = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const clientToken = authHeader && authHeader.split(" ")[1];
+  const EXPECTED_SECRET = process.env.API_SECRET_KEY || "blinks-secure-key-2026";
+
+  if (!clientToken || clientToken !== EXPECTED_SECRET) {
+    return res.status(403).json({
+      success: false,
+      message: "Access Denied: Unauthorized API request.",
+    });
+  }
+  next();
+};
+
 // ================= API ROUTES =================
 
 // 1. Health Check
 app.get("/", (req, res) => {
-  res.send("Blinks API is running live 🚀");
+  res.send("Blinks API is running securely 🚀");
 });
 
 // 2. Admin Login
@@ -147,12 +161,13 @@ app.post("/api/auth/admin-login", (req, res) => {
     const { username, password } = req.body;
     const ADMIN_USER = process.env.ADMIN_USER || "admin@blinks.pk";
     const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
+    const API_SECRET = process.env.API_SECRET_KEY || "blinks-secure-key-2026";
 
     if (username === ADMIN_USER && password === ADMIN_PASS) {
       return res.json({
         success: true,
         message: "Login successful",
-        token: "admin-secret-session-token",
+        token: API_SECRET,
         user: { username: ADMIN_USER, role: "admin" },
       });
     } else {
@@ -166,11 +181,11 @@ app.post("/api/auth/admin-login", (req, res) => {
   }
 });
 
-// 3. 🎯 ULTRA-LIGHT GET ALL PROFILES (Images aur heavy data filter kar diya - Size: 10-20 KB)
+// 3. GET ALL PROFILES (Public View list)
 app.get("/api/profiles", async (req, res) => {
   try {
     const profiles = await Profile.find()
-      .select("name businessName slug designation phone status scans totalActions createdAt")
+      .select("name businessName slug designation phone status scans totalActions businessCategory createdAt")
       .sort({ createdAt: -1 });
     res.json({ success: true, profiles });
   } catch (err) {
@@ -178,7 +193,7 @@ app.get("/api/profiles", async (req, res) => {
   }
 });
 
-// 4. 🎯 GET SINGLE PROFILE BY ID OR SLUG (Sirf ek profile ka pura data aayega)
+// 4. GET SINGLE PROFILE BY ID OR SLUG (Public Profile Page)
 app.get("/api/profiles/single/:identifier", async (req, res) => {
   try {
     const target = req.params.identifier.trim();
@@ -200,7 +215,6 @@ app.get("/api/profiles/single/:identifier", async (req, res) => {
   }
 });
 
-// Purana compatibility slug route
 app.get("/api/profiles/slug/:slug", async (req, res) => {
   try {
     const slug = req.params.slug.toLowerCase().trim();
@@ -214,11 +228,12 @@ app.get("/api/profiles/slug/:slug", async (req, res) => {
   }
 });
 
-// 5. Create Profile
-app.post("/api/profiles", async (req, res) => {
+// 5. Create Profile (Protected with Secret Token)
+app.post("/api/profiles", verifySecretAuth, async (req, res) => {
   try {
     const data = req.body;
     data.slug = data.slug.toLowerCase().trim();
+    data.businessCategory = String(data.businessCategory || "food").toLowerCase().trim();
 
     const existing = await Profile.findOne({ slug: data.slug });
     if (existing) {
@@ -233,12 +248,15 @@ app.post("/api/profiles", async (req, res) => {
   }
 });
 
-// 6. Update Profile
-app.put("/api/profiles/:id", async (req, res) => {
+// 6. Update Profile (Protected with Secret Token)
+app.put("/api/profiles/:id", verifySecretAuth, async (req, res) => {
   try {
     const target = req.params.id;
-    let updated = null;
+    if (req.body.businessCategory) {
+      req.body.businessCategory = String(req.body.businessCategory).toLowerCase().trim();
+    }
 
+    let updated = null;
     if (mongoose.Types.ObjectId.isValid(target)) {
       updated = await Profile.findByIdAndUpdate(
         target,
@@ -266,8 +284,8 @@ app.put("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 7. Delete Profile
-app.delete("/api/profiles/:id", async (req, res) => {
+// 7. Delete Profile (Protected with Secret Token)
+app.delete("/api/profiles/:id", verifySecretAuth, async (req, res) => {
   try {
     const target = req.params.id;
     if (mongoose.Types.ObjectId.isValid(target)) {
@@ -281,7 +299,7 @@ app.delete("/api/profiles/:id", async (req, res) => {
   }
 });
 
-// 8. Analytics
+// 8. Public Analytics (Scan & Action Counters)
 app.post("/api/analytics/scan", async (req, res) => {
   try {
     const { slug } = req.body;
