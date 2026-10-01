@@ -259,7 +259,7 @@ app.post("/api/auth/admin-login", loginLimiter, async (req, res) => {
 app.get("/api/profiles", async (req, res) => {
   try {
     const profiles = await Profile.find()
-      .select("name businessName slug designation profilePhoto status scans totalActions businessCategory createdAt")
+      .select("name businessName slug designation status scans totalActions businessCategory createdAt")
       .sort({ createdAt: -1 });
     res.json({ success: true, profiles });
   } catch (err) {
