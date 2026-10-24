@@ -255,11 +255,11 @@ app.post("/api/auth/admin-login", loginLimiter, async (req, res) => {
   }
 });
 
-// 3. GET ALL PROFILES (Sanitized)
+// 3. GET ALL PROFILES (Sanitized with eventAnalytics added)
 app.get("/api/profiles", async (req, res) => {
   try {
     const profiles = await Profile.find()
-      .select("name businessName slug designation status scans totalActions businessCategory createdAt")
+      .select("name businessName slug designation status scans totalActions eventAnalytics businessCategory createdAt")
       .sort({ createdAt: -1 });
     res.json({ success: true, profiles });
   } catch (err) {
